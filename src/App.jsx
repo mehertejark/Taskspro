@@ -21,7 +21,7 @@ const JSONBIN_BIN_ID  = "69a8f8afae596e708f609e43";    // e.g. "65f3a2b1..."
 
 const SYNC_CONFIGURED = (
 JSONBIN_API_KEY !== "YOUR_API_KEY_HERE" &&
-JSONBIN_BIN_ID  !== "YOUR_BIN_ID_HERE"0
+JSONBIN_BIN_ID  !== "YOUR_BIN_ID_HERE"
 );
 
 // ── JSONBin API ───────────────────────────────────────────────────────────────
