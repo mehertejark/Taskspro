@@ -149,36 +149,6 @@ function makeDefault() {
   };
 }
 
-// ── Setup Banner ──────────────────────────────────────────────────────────────
-function SetupBanner() {
-  const [open, setOpen] = useState(true);
-  if (!open) return (
-    <div style={{ background: "#e65100", color: "white", fontSize: 12, padding: "4px 12px", display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-      ⚠️ Running in local-only mode — data won't sync across devices.
-      <button onClick={() => setOpen(true)} style={{ background: "none", border: "1px solid rgba(255,255,255,0.5)", borderRadius: 4, color: "white", fontSize: 11, padding: "1px 6px", cursor: "pointer" }}>Setup sync</button>
-    </div>
-  );
-  return (
-    <div style={{ background: "#1a73e8", color: "white", padding: "10px 16px", flexShrink: 0 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-        <strong style={{ fontSize: 13 }}>☁️ Enable cross-device sync (free, takes 2 minutes)</strong>
-        <button onClick={() => setOpen(false)} style={{ background: "none", border: "none", color: "white", fontSize: 18, cursor: "pointer", lineHeight: 1 }}>×</button>
-      </div>
-      <ol style={{ margin: 0, paddingLeft: 18, fontSize: 12, lineHeight: "20px" }}>
-        <li>Go to <strong>jsonbin.io</strong> → Sign Up free → copy your <strong>Master Key</strong></li>
-        <li>Click <strong>Create a Bin</strong> → paste <code style={{ background: "rgba(255,255,255,0.2)", padding: "0 3px", borderRadius: 3 }}>{`{"lists":[],"tasks":[],"listOrder":[]}`}</code> → Create</li>
-        <li>Copy the <strong>Bin ID</strong> from the URL (the part after /b/)</li>
-        <li>In your GitHub repo, open <strong>src/App.jsx</strong> → edit the two lines at the top:<br />
-          <code style={{ background: "rgba(255,255,255,0.2)", padding: "2px 6px", borderRadius: 3, display: "inline-block", marginTop: 3 }}>
-            JSONBIN_API_KEY = "paste your Master Key"<br />
-            JSONBIN_BIN_ID = "paste your Bin ID"
-          </code>
-        </li>
-        <li>Commit → Cloudflare auto-deploys → sync works on all devices ✅</li>
-      </ol>
-    </div>
-  );
-}
 
 // ── Sync Status Indicator ─────────────────────────────────────────────────────
 function SyncDot({ status }) {
@@ -555,9 +525,7 @@ export default function App() {
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh", fontFamily: "'Google Sans', Roboto, Arial, sans-serif", background: "#f8f9fa", overflow: "hidden" }}>
 
-      {/* Setup banner — only shown when sync not configured */}
-      {!SYNC_CONFIGURED && <SetupBanner />}
-
+     
       <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
         {/* Sidebar */}
         <aside style={{ width: 220, minWidth: 220, background: "white", borderRight: "1px solid #e0e0e0", display: "flex", flexDirection: "column", overflow: "hidden", flexShrink: 0 }}>
