@@ -4,13 +4,13 @@ import { getDatabase, ref, onValue, set } from "https://www.gstatic.com/firebase
 
 // ── Firebase Configuration ────────────────────────────────────────────────────
 const firebaseConfig = {
-  apiKey: "AIzaSyAxBqGcjCl-u2RoLS19swFQylG9kjRkq4Y",
-  authDomain: "taskspro-2caf2.firebaseapp.com",
-  databaseURL: "https://taskspro-2caf2-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "taskspro-2caf2",
-  storageBucket: "taskspro-2caf2.firebasestorage.app",
-  messagingSenderId: "834110914419",
-  appId: "1:834110914419:web:aa5bbca53b31541e7ecf06",
+  apiKey: "AIzaSyBQoAEZdezingDIxxHTyRTaHmopgt6mTD4",
+  authDomain: "taskspro-27794.firebaseapp.com",
+  databaseURL: "https://taskspro-27794-default-rtdb.firebaseio.com",
+  projectId: "taskspro-27794",
+  storageBucket: "taskspro-27794.firebasestorage.app",
+  messagingSenderId: "52921013731",
+  appId: "1:52921013731:web:c72e29ca5f7fcb6a203cd6",
 };
 
 const firebaseApp = initializeApp(firebaseConfig);
@@ -346,21 +346,18 @@ export default function App() {
   const [ready, setReady] = useState(false);
 
   const saveTimer = useRef(null);
-  const isRemoteUpdate = useRef(false); // flag to avoid save loop
   const taskDragRef = useRef({});
   const [draggingTaskId, setDraggingTaskId] = useState(null);
   const listDragRef = useRef({});
   const [draggingListId, setDraggingListId] = useState(null);
 
-  // ── Real-time listener — fires instantly when any device changes data ──
+  // ── Real-time listener ────────────────────────────────────────────────────
   useEffect(() => {
     const unsub = onValue(DATA_REF, (snapshot) => {
       const val = snapshot.val();
-      isRemoteUpdate.current = true;
       if (val) {
         setData(val);
       } else {
-        // First time — no data in Firebase yet, seed with defaults
         const defaults = makeDefault();
         setData(defaults);
         set(DATA_REF, defaults);
@@ -370,7 +367,6 @@ export default function App() {
     }, (error) => {
       console.error("Firebase error", error);
       setSyncStatus("error");
-      // Fall back to empty state so app still loads
       setData(makeDefault());
       setReady(true);
     });
@@ -383,15 +379,11 @@ export default function App() {
     saveTimer.current = setTimeout(async () => {
       await saveData(d);
       setSyncStatus("synced");
-    }, 400); // 400ms debounce — fast but avoids saving on every keystroke
+    }, 400);
   }, []);
 
   const update = useCallback((fn) => {
-    setData((prev) => {
-      const next = fn(prev);
-      persist(next);
-      return next;
-    });
+    setData((prev) => { const next = fn(prev); persist(next); return next; });
   }, [persist]);
 
   if (!ready) return (
@@ -404,7 +396,7 @@ export default function App() {
   const { lists, tasks, listOrder } = data;
   const orderedLists = listOrder.map((id) => lists.find((l) => l.id === id)).filter(Boolean);
 
-  // ── List ops ──
+  // ── List ops ──────────────────────────────────────────────────────────────
   const addList = () => { const id = uid(); update((d) => ({ ...d, lists: [...d.lists, { id, title: "New List", sort: "manual" }], listOrder: [...d.listOrder, id] })); setActiveView(id); };
   const deleteList = (listId) => {
     update((d) => {
@@ -418,7 +410,7 @@ export default function App() {
   const renameList = (listId, title) => update((d) => ({ ...d, lists: d.lists.map((l) => l.id === listId ? { ...l, title } : l) }));
   const sortList = (listId, sort) => update((d) => ({ ...d, lists: d.lists.map((l) => l.id === listId ? { ...l, sort } : l) }));
 
-  // ── Task ops ──
+  // ── Task ops ──────────────────────────────────────────────────────────────
   const addTask = (listId, text, priority) => update((d) => ({ ...d, tasks: [...d.tasks, { id: uid(), listId, text, priority, rank: null, completed: false }] }));
   const updateTask = (taskId, patch) => update((d) => ({ ...d, tasks: d.tasks.map((t) => t.id === taskId ? { ...t, ...patch } : t) }));
   const deleteTask = (taskId) => update((d) => ({ ...d, tasks: clearAndCompactRank(d.tasks, taskId).filter((t) => t.id !== taskId) }));
@@ -434,7 +426,7 @@ export default function App() {
   const changeRank = (taskId, r) => update((d) => ({ ...d, tasks: applySmartRank(d.tasks, taskId, r) }));
   const changePriority = (taskId, p) => update((d) => ({ ...d, tasks: d.tasks.map((t) => t.id === taskId ? { ...t, priority: p } : t) }));
 
-  // ── Task drag ──
+  // ── Task drag ─────────────────────────────────────────────────────────────
   const onTaskDragStart = (taskId) => { taskDragRef.current = { taskId }; setDraggingTaskId(taskId); };
   const onTaskDragEnd = () => { setDraggingTaskId(null); taskDragRef.current = {}; };
   const onTaskDragOver = (overTaskId, toListId) => { taskDragRef.current.overTaskId = overTaskId; taskDragRef.current.toListId = toListId; };
@@ -454,7 +446,7 @@ export default function App() {
     onTaskDragEnd();
   };
 
-  // ── List drag ──
+  // ── List drag ─────────────────────────────────────────────────────────────
   const onListDragStart = (listId) => { listDragRef.current = { listId }; setDraggingListId(listId); };
   const onListDragEnd = () => { setDraggingListId(null); listDragRef.current = {}; };
   const onListDragOver = (overListId) => { listDragRef.current.overListId = overListId; };
