@@ -12,6 +12,7 @@ const firebaseConfig = {
   appId: "1:898953783615:web:80931bfaf96f01d4d9cb8a",
   measurementId: "G-3ETQJL1ECX"
 }
+
 const firebaseApp = initializeApp(firebaseConfig);
 const db = getDatabase(firebaseApp);
 const DATA_REF = ref(db, "tasks-data");
@@ -46,6 +47,21 @@ function sortActiveTasks(tasks, sort) {
     });
   }
   return [...s, ...done];
+}
+
+// Sort for Priority Summary: H→M→L, then by rank within same priority (nulls last)
+function sortByPriorityThenRank(tasks) {
+  const PORD = { H: 0, M: 1, L: 2 };
+  return tasks
+    .filter((t) => !t.completed)
+    .sort((a, b) => {
+      const pd = (PORD[a.priority] ?? 9) - (PORD[b.priority] ?? 9);
+      if (pd !== 0) return pd;
+      if (a.rank == null && b.rank == null) return 0;
+      if (a.rank == null) return 1;
+      if (b.rank == null) return -1;
+      return a.rank - b.rank;
+    });
 }
 
 function applySmartRank(allTasks, taskId, newRank) {
@@ -175,8 +191,8 @@ function RankField({ rank, onChange }) {
   );
 }
 
-// ── InlineText ────────────────────────────────────────────────────────────────
-function InlineText({ value, onSave, textStyle = {}, placeholder = "" }) {
+// ── InlineText — supports multiline wrapping ──────────────────────────────────
+function InlineText({ value, onSave, multiline = false, textStyle = {}, placeholder = "" }) {
   const [editing, setEditing] = useState(false);
   const [val, setVal] = useState(value);
   useEffect(() => { if (!editing) setVal(value); }, [value, editing]);
@@ -185,17 +201,37 @@ function InlineText({ value, onSave, textStyle = {}, placeholder = "" }) {
     if (val.trim()) onSave(val.trim());
     else setVal(value);
   };
-  if (editing) return (
-    <input value={val}
-      onChange={(e) => setVal(e.target.value)}
-      onBlur={commit}
-      onKeyDown={(e) => { if (e.key === "Enter") commit(); if (e.key === "Escape") { setEditing(false); setVal(value); } }}
-      style={{ flex: 1, border: "none", borderBottom: "2px solid #1a73e8", outline: "none", fontSize: 14, background: "transparent", fontFamily: "inherit", color: "#202124", minWidth: 0, ...textStyle }}
-      autoFocus />
-  );
+  if (editing) {
+    if (multiline) return (
+      <textarea value={val}
+        onChange={(e) => setVal(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); commit(); } if (e.key === "Escape") { setEditing(false); setVal(value); } }}
+        rows={2}
+        style={{ flex: 1, border: "none", borderBottom: "2px solid #1a73e8", outline: "none", fontSize: 14, background: "transparent", fontFamily: "inherit", color: "#202124", minWidth: 0, resize: "none", lineHeight: "1.4", ...textStyle }}
+        autoFocus />
+    );
+    return (
+      <input value={val}
+        onChange={(e) => setVal(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => { if (e.key === "Enter") commit(); if (e.key === "Escape") { setEditing(false); setVal(value); } }}
+        style={{ flex: 1, border: "none", borderBottom: "2px solid #1a73e8", outline: "none", fontSize: 14, background: "transparent", fontFamily: "inherit", color: "#202124", minWidth: 0, ...textStyle }}
+        autoFocus />
+    );
+  }
   return (
     <span onDoubleClick={() => setEditing(true)} title="Double-click to edit"
-      style={{ flex: 1, fontSize: 14, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", cursor: "text", minWidth: 0, ...textStyle }}
+      style={{
+        flex: 1, fontSize: 14, cursor: "text", minWidth: 0,
+        // CHANGE 2: wrap text instead of truncating
+        whiteSpace: multiline ? "pre-wrap" : "nowrap",
+        wordBreak: multiline ? "break-word" : "normal",
+        overflow: multiline ? "visible" : "hidden",
+        textOverflow: multiline ? "unset" : "ellipsis",
+        lineHeight: "1.4",
+        ...textStyle,
+      }}
     >{value || <span style={{ color: "#9aa0a6" }}>{placeholder}</span>}</span>
   );
 }
@@ -208,18 +244,21 @@ function TaskRow({ task, onUpdate, onDelete, onComplete, onRank, onPriority, isD
       onDragEnd={onDragEnd}
       onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); onDragOver(task.id); }}
       onDrop={(e) => { e.preventDefault(); e.stopPropagation(); onDrop(task.id); }}
-      style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 10px", background: isDragging ? "#e8f0fe" : "white", borderBottom: "1px solid #f1f3f4", cursor: "grab", opacity: task.completed ? 0.65 : 1, minWidth: 0 }}
+      style={{ display: "flex", alignItems: "flex-start", gap: 5, padding: "8px 10px", background: isDragging ? "#e8f0fe" : "white", borderBottom: "1px solid #f1f3f4", cursor: "grab", opacity: task.completed ? 0.65 : 1, minWidth: 0 }}
     >
       <input type="checkbox" checked={task.completed} onChange={() => onComplete(task.id)}
         onClick={(e) => e.stopPropagation()}
-        style={{ accentColor: "#1a73e8", flexShrink: 0, width: 15, height: 15, cursor: "pointer" }} />
-      <InlineText value={task.text} onSave={(t) => onUpdate(task.id, { text: t })}
+        style={{ accentColor: "#1a73e8", flexShrink: 0, width: 15, height: 15, cursor: "pointer", marginTop: 2 }} />
+      {/* CHANGE 2: multiline=true so text wraps */}
+      <InlineText value={task.text} onSave={(t) => onUpdate(task.id, { text: t })} multiline={true}
         textStyle={task.completed ? { textDecoration: "line-through", color: "#9aa0a6" } : { color: "#202124" }}
         placeholder="Task" />
-      <PriorityBtn priority={task.priority} onChange={(p) => onPriority(task.id, p)} />
-      <RankField rank={task.rank} onChange={(r) => onRank(task.id, r)} />
+      <div style={{ display: "flex", flexDirection: "column", gap: 3, flexShrink: 0, alignItems: "flex-end" }}>
+        <PriorityBtn priority={task.priority} onChange={(p) => onPriority(task.id, p)} />
+        <RankField rank={task.rank} onChange={(r) => onRank(task.id, r)} />
+      </div>
       <button onClick={(e) => { e.stopPropagation(); onDelete(task.id); }}
-        style={{ background: "none", border: "none", cursor: "pointer", color: "#bdbdbd", fontSize: 17, padding: "0 2px", lineHeight: 1, flexShrink: 0 }}
+        style={{ background: "none", border: "none", cursor: "pointer", color: "#bdbdbd", fontSize: 17, padding: "0 2px", lineHeight: 1, flexShrink: 0, marginTop: 1 }}
         title="Delete">×</button>
     </div>
   );
@@ -303,22 +342,32 @@ function ListCard({ list, tasks, onAddTask, onUpdateTask, onDeleteTask, onComple
   );
 }
 
-// ── SummaryView ───────────────────────────────────────────────────────────────
-function SummaryView({ allTasks, onComplete, onRank, onPriority }) {
+// ── SummaryView — CHANGE 3: inline text editing enabled ──────────────────────
+function SummaryView({ allTasks, onComplete, onRank, onPriority, onUpdateTask }) {
   const ranked = allTasks.filter((t) => t.rank != null && !t.completed).sort((a, b) => a.rank - b.rank);
   return (
-    <div style={{ padding: "20px 24px", maxWidth: 640 }}>
+    <div style={{ padding: "20px 24px", maxWidth: 680 }}>
       <h2 style={{ margin: "0 0 4px", fontSize: 18, fontWeight: 600, color: "#202124" }}>⭐ Focus Summary</h2>
-      <p style={{ margin: "0 0 16px", fontSize: 13, color: "#5f6368" }}>Ranked tasks in ascending order</p>
+      <p style={{ margin: "0 0 16px", fontSize: 13, color: "#5f6368" }}>Ranked tasks — double-tap text to edit</p>
       {ranked.length === 0
         ? <div style={{ padding: 24, background: "white", borderRadius: 8, border: "1px solid #e0e0e0", color: "#9aa0a6", fontSize: 14, textAlign: "center" }}>No ranked tasks yet. Click — on any task to assign a rank.</div>
         : ranked.map((task) => (
-          <div key={task.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", background: "white", borderRadius: 8, border: "1px solid #e0e0e0", marginBottom: 6, boxShadow: "0 1px 2px rgba(0,0,0,0.05)" }}>
-            <span style={{ fontSize: 12, color: "#1a73e8", fontWeight: 700, minWidth: 26, flexShrink: 0 }}>#{task.rank}</span>
-            <input type="checkbox" checked={task.completed} onChange={() => onComplete(task.id)} style={{ accentColor: "#1a73e8", flexShrink: 0, width: 15, height: 15, cursor: "pointer" }} />
-            <span style={{ flex: 1, fontSize: 14, color: "#202124", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{task.text}</span>
-            <PriorityBtn priority={task.priority} onChange={(p) => onPriority(task.id, p)} />
-            <RankField rank={task.rank} onChange={(r) => onRank(task.id, r)} />
+          <div key={task.id} style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "10px 12px", background: "white", borderRadius: 8, border: "1px solid #e0e0e0", marginBottom: 6, boxShadow: "0 1px 2px rgba(0,0,0,0.05)" }}>
+            <span style={{ fontSize: 12, color: "#1a73e8", fontWeight: 700, minWidth: 26, flexShrink: 0, paddingTop: 2 }}>#{task.rank}</span>
+            <input type="checkbox" checked={task.completed} onChange={() => onComplete(task.id)}
+              style={{ accentColor: "#1a73e8", flexShrink: 0, width: 15, height: 15, cursor: "pointer", marginTop: 2 }} />
+            {/* CHANGE 3: InlineText with multiline editing instead of plain span */}
+            <InlineText
+              value={task.text}
+              onSave={(t) => onUpdateTask(task.id, { text: t })}
+              multiline={true}
+              textStyle={{ color: "#202124" }}
+              placeholder="Task"
+            />
+            <div style={{ display: "flex", flexDirection: "column", gap: 3, flexShrink: 0, alignItems: "flex-end" }}>
+              <PriorityBtn priority={task.priority} onChange={(p) => onPriority(task.id, p)} />
+              <RankField rank={task.rank} onChange={(r) => onRank(task.id, r)} />
+            </div>
           </div>
         ))
       }
@@ -343,6 +392,8 @@ export default function App() {
   const [activeView, setActiveView] = useState("__summary__");
   const [syncStatus, setSyncStatus] = useState("connecting");
   const [ready, setReady] = useState(false);
+  // CHANGE 1: collapsible sidebar
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const saveTimer = useRef(null);
   const taskDragRef = useRef({});
@@ -350,7 +401,6 @@ export default function App() {
   const listDragRef = useRef({});
   const [draggingListId, setDraggingListId] = useState(null);
 
-  // ── Real-time listener ────────────────────────────────────────────────────
   useEffect(() => {
     const unsub = onValue(DATA_REF, (snapshot) => {
       const val = snapshot.val();
@@ -395,7 +445,6 @@ export default function App() {
   const { lists, tasks, listOrder } = data;
   const orderedLists = listOrder.map((id) => lists.find((l) => l.id === id)).filter(Boolean);
 
-  // ── List ops ──────────────────────────────────────────────────────────────
   const addList = () => { const id = uid(); update((d) => ({ ...d, lists: [...d.lists, { id, title: "New List", sort: "manual" }], listOrder: [...d.listOrder, id] })); setActiveView(id); };
   const deleteList = (listId) => {
     update((d) => {
@@ -408,8 +457,6 @@ export default function App() {
   };
   const renameList = (listId, title) => update((d) => ({ ...d, lists: d.lists.map((l) => l.id === listId ? { ...l, title } : l) }));
   const sortList = (listId, sort) => update((d) => ({ ...d, lists: d.lists.map((l) => l.id === listId ? { ...l, sort } : l) }));
-
-  // ── Task ops ──────────────────────────────────────────────────────────────
   const addTask = (listId, text, priority) => update((d) => ({ ...d, tasks: [...d.tasks, { id: uid(), listId, text, priority, rank: null, completed: false }] }));
   const updateTask = (taskId, patch) => update((d) => ({ ...d, tasks: d.tasks.map((t) => t.id === taskId ? { ...t, ...patch } : t) }));
   const deleteTask = (taskId) => update((d) => ({ ...d, tasks: clearAndCompactRank(d.tasks, taskId).filter((t) => t.id !== taskId) }));
@@ -425,7 +472,6 @@ export default function App() {
   const changeRank = (taskId, r) => update((d) => ({ ...d, tasks: applySmartRank(d.tasks, taskId, r) }));
   const changePriority = (taskId, p) => update((d) => ({ ...d, tasks: d.tasks.map((t) => t.id === taskId ? { ...t, priority: p } : t) }));
 
-  // ── Task drag ─────────────────────────────────────────────────────────────
   const onTaskDragStart = (taskId) => { taskDragRef.current = { taskId }; setDraggingTaskId(taskId); };
   const onTaskDragEnd = () => { setDraggingTaskId(null); taskDragRef.current = {}; };
   const onTaskDragOver = (overTaskId, toListId) => { taskDragRef.current.overTaskId = overTaskId; taskDragRef.current.toListId = toListId; };
@@ -445,7 +491,6 @@ export default function App() {
     onTaskDragEnd();
   };
 
-  // ── List drag ─────────────────────────────────────────────────────────────
   const onListDragStart = (listId) => { listDragRef.current = { listId }; setDraggingListId(listId); };
   const onListDragEnd = () => { setDraggingListId(null); listDragRef.current = {}; };
   const onListDragOver = (overListId) => { listDragRef.current.overListId = overListId; };
@@ -473,51 +518,82 @@ export default function App() {
   return (
     <div style={{ display: "flex", height: "100vh", fontFamily: "'Google Sans', Roboto, Arial, sans-serif", background: "#f8f9fa", overflow: "hidden" }}>
 
-      {/* Sidebar */}
-      <aside style={{ width: 220, minWidth: 220, background: "white", borderRight: "1px solid #e0e0e0", display: "flex", flexDirection: "column", overflow: "hidden", flexShrink: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "14px 14px 10px" }}>
+      {/* CHANGE 1: Collapsible sidebar */}
+      <aside style={{
+        width: sidebarOpen ? 220 : 0,
+        minWidth: sidebarOpen ? 220 : 0,
+        background: "white",
+        borderRight: sidebarOpen ? "1px solid #e0e0e0" : "none",
+        display: "flex", flexDirection: "column", overflow: "hidden",
+        flexShrink: 0,
+        transition: "width 0.25s ease, min-width 0.25s ease",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "14px 14px 10px", minWidth: 220 }}>
           <span style={{ fontSize: 22 }}>✓</span>
           <span style={{ fontSize: 16, fontWeight: 600, color: "#202124", flex: 1 }}>Tasks</span>
           <SyncDot status={syncStatus} />
         </div>
-        <nav style={{ flex: 1, overflowY: "auto", padding: "0 8px" }}>
-          <NavItem label="⭐ Focus Summary" active={activeView === "__summary__"} onClick={() => setActiveView("__summary__")} />
-          <NavItem label="⊞ Board View" active={activeView === "__all__"} onClick={() => setActiveView("__all__")} />
+        <nav style={{ flex: 1, overflowY: "auto", padding: "0 8px", minWidth: 220 }}>
+          <NavItem label="⭐ Focus Summary" active={activeView === "__summary__"} onClick={() => { setActiveView("__summary__"); }} />
+          <NavItem label="⊞ Board View" active={activeView === "__all__"} onClick={() => { setActiveView("__all__"); }} />
           <div style={{ borderTop: "1px solid #f1f3f4", margin: "6px 0" }} />
           <div style={{ fontSize: 11, color: "#9aa0a6", padding: "0 12px 4px", textTransform: "uppercase", letterSpacing: "0.06em" }}>My Lists</div>
           {orderedLists.map((list) => (
             <NavItem key={list.id} label={list.title} icon="☰"
               count={tasks.filter((t) => t.listId === list.id && !t.completed).length}
-              active={activeView === list.id} onClick={() => setActiveView(list.id)} />
+              active={activeView === list.id} onClick={() => { setActiveView(list.id); }} />
           ))}
         </nav>
-        <div style={{ padding: "8px 10px", borderTop: "1px solid #f1f3f4" }}>
+        <div style={{ padding: "8px 10px", borderTop: "1px solid #f1f3f4", minWidth: 220 }}>
           <button onClick={addList} style={{ width: "100%", padding: "7px 10px", borderRadius: 24, border: "none", background: "transparent", cursor: "pointer", textAlign: "left", fontSize: 14, color: "#1a73e8", display: "flex", alignItems: "center", gap: 8, fontFamily: "inherit" }}>
             <span style={{ fontSize: 18, lineHeight: 1 }}>+</span> New list
           </button>
         </div>
       </aside>
 
-      {/* Main */}
-      <main style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
-        {activeView === "__summary__" ? (
-          <div style={{ flex: 1, overflowY: "auto" }}>
-            <SummaryView allTasks={tasks} onComplete={completeTask} onRank={changeRank} onPriority={changePriority} />
-          </div>
-        ) : (
-          <div style={{ flex: 1, overflowX: "auto", overflowY: "hidden", padding: 16, display: "flex", gap: 14, alignItems: "flex-start" }}>
-            {visibleLists.map((list) => (
-              <ListCard key={list.id} list={list} tasks={tasks.filter((t) => t.listId === list.id)}
-                isListDragging={draggingListId === list.id}
-                onAddTask={addTask} onDeleteList={deleteList} onRenameList={renameList} onSortChange={sortList}
-                {...sharedProps} />
-            ))}
-            <button onClick={addList} style={{ flexShrink: 0, height: 48, padding: "0 18px", border: "2px dashed #dadce0", borderRadius: 8, background: "transparent", color: "#5f6368", cursor: "pointer", fontSize: 13, fontFamily: "inherit", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap", alignSelf: "flex-start" }}>
-              + New list
-            </button>
-          </div>
-        )}
-      </main>
+      {/* Main area */}
+      <div style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column", minWidth: 0 }}>
+
+        {/* Top bar with hamburger toggle */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", background: "white", borderBottom: "1px solid #e0e0e0", flexShrink: 0 }}>
+          {/* CHANGE 1: hamburger button */}
+          <button
+            onClick={() => setSidebarOpen((o) => !o)}
+            title={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
+            style={{ background: "none", border: "none", cursor: "pointer", padding: "4px 6px", borderRadius: 6, color: "#5f6368", fontSize: 18, lineHeight: 1, display: "flex", flexDirection: "column", gap: 3, alignItems: "center", justifyContent: "center", flexShrink: 0 }}
+          >
+            <span style={{ display: "block", width: 18, height: 2, background: "#5f6368", borderRadius: 2 }} />
+            <span style={{ display: "block", width: 18, height: 2, background: "#5f6368", borderRadius: 2 }} />
+            <span style={{ display: "block", width: 18, height: 2, background: "#5f6368", borderRadius: 2 }} />
+          </button>
+          <span style={{ fontSize: 15, fontWeight: 600, color: "#202124" }}>
+            {activeView === "__summary__" ? "⭐ Focus Summary"
+              : activeView === "__all__" ? "⊞ Board View"
+              : orderedLists.find((l) => l.id === activeView)?.title ?? "Tasks"}
+          </span>
+          {!sidebarOpen && <SyncDot status={syncStatus} />}
+        </div>
+
+        <main style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+          {activeView === "__summary__" ? (
+            <div style={{ flex: 1, overflowY: "auto" }}>
+              <SummaryView allTasks={tasks} onComplete={completeTask} onRank={changeRank} onPriority={changePriority} onUpdateTask={updateTask} />
+            </div>
+          ) : (
+            <div style={{ flex: 1, overflowX: "auto", overflowY: "hidden", padding: 16, display: "flex", gap: 14, alignItems: "flex-start" }}>
+              {visibleLists.map((list) => (
+                <ListCard key={list.id} list={list} tasks={tasks.filter((t) => t.listId === list.id)}
+                  isListDragging={draggingListId === list.id}
+                  onAddTask={addTask} onDeleteList={deleteList} onRenameList={renameList} onSortChange={sortList}
+                  {...sharedProps} />
+              ))}
+              <button onClick={addList} style={{ flexShrink: 0, height: 48, padding: "0 18px", border: "2px dashed #dadce0", borderRadius: 8, background: "transparent", color: "#5f6368", cursor: "pointer", fontSize: 13, fontFamily: "inherit", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap", alignSelf: "flex-start" }}>
+                + New list
+              </button>
+            </div>
+          )}
+        </main>
+      </div>
     </div>
   );
 }
