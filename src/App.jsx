@@ -376,6 +376,50 @@ function SummaryView({ allTasks, onComplete, onRank, onPriority, onUpdateTask })
   );
 }
 
+// ── PrioritySummaryView — sorted by Priority (H→M→L) then Rank ───────────────
+function PrioritySummaryView({ allTasks, onComplete, onRank, onPriority, onUpdateTask }) {
+  const sorted = sortByPriorityThenRank(allTasks);
+  const PLABEL = {
+    H: { label: "High Priority",   color: "#e65100", bg: "#fff3e0", border: "#ffb74d" },
+    M: { label: "Medium Priority", color: "#b8860b", bg: "#fffde7", border: "#ffe082" },
+    L: { label: "Low Priority",    color: "#2e7d32", bg: "#e8f5e9", border: "#a5d6a7" },
+  };
+  let lastPriority = null;
+  return (
+    <div style={{ padding: "20px 24px", maxWidth: 680 }}>
+      <h2 style={{ margin: "0 0 4px", fontSize: 18, fontWeight: 600, color: "#202124" }}>🎯 Priority Summary</h2>
+      <p style={{ margin: "0 0 16px", fontSize: 13, color: "#5f6368" }}>All tasks by priority (H→M→L), then by rank — double-tap text to edit</p>
+      {sorted.length === 0
+        ? <div style={{ padding: 24, background: "white", borderRadius: 8, border: "1px solid #e0e0e0", color: "#9aa0a6", fontSize: 14, textAlign: "center" }}>No active tasks yet. Add tasks from the Board View.</div>
+        : sorted.map((task) => {
+            const showHeader = task.priority !== lastPriority;
+            lastPriority = task.priority;
+            const pc = PLABEL[task.priority] ?? PLABEL.M;
+            return (
+              <div key={task.id}>
+                {showHeader && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "16px 0 8px", paddingBottom: 5, borderBottom: `2px solid ${pc.border}` }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: pc.color, background: pc.bg, border: `1.5px solid ${pc.border}`, borderRadius: 4, padding: "2px 10px", letterSpacing: "0.02em" }}>{pc.label}</span>
+                  </div>
+                )}
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "10px 12px", background: "white", borderRadius: 8, border: "1px solid #e0e0e0", marginBottom: 6, boxShadow: "0 1px 2px rgba(0,0,0,0.05)" }}>
+                  <input type="checkbox" checked={task.completed} onChange={() => onComplete(task.id)}
+                    style={{ accentColor: "#1a73e8", flexShrink: 0, width: 15, height: 15, cursor: "pointer", marginTop: 2 }} />
+                  <InlineText value={task.text} onSave={(t) => onUpdateTask(task.id, { text: t })}
+                    multiline={true} textStyle={{ color: "#202124" }} placeholder="Task" />
+                  <div style={{ display: "flex", flexDirection: "column", gap: 3, flexShrink: 0, alignItems: "flex-end" }}>
+                    <PriorityBtn priority={task.priority} onChange={(p) => onPriority(task.id, p)} />
+                    <RankField rank={task.rank} onChange={(r) => onRank(task.id, r)} />
+                  </div>
+                </div>
+              </div>
+            );
+          })
+      }
+    </div>
+  );
+}
+
 // ── NavItem ───────────────────────────────────────────────────────────────────
 function NavItem({ label, icon, count, active, onClick }) {
   return (
@@ -536,6 +580,7 @@ export default function App() {
         </div>
         <nav style={{ flex: 1, overflowY: "auto", padding: "0 8px", minWidth: 220 }}>
           <NavItem label="⭐ Focus Summary" active={activeView === "__summary__"} onClick={() => { setActiveView("__summary__"); }} />
+          <NavItem label="🎯 Priority Summary" active={activeView === "__priority__"} onClick={() => { setActiveView("__priority__"); }} />
           <NavItem label="⊞ Board View" active={activeView === "__all__"} onClick={() => { setActiveView("__all__"); }} />
           <div style={{ borderTop: "1px solid #f1f3f4", margin: "6px 0" }} />
           <div style={{ fontSize: 11, color: "#9aa0a6", padding: "0 12px 4px", textTransform: "uppercase", letterSpacing: "0.06em" }}>My Lists</div>
@@ -569,6 +614,7 @@ export default function App() {
           </button>
           <span style={{ fontSize: 15, fontWeight: 600, color: "#202124" }}>
             {activeView === "__summary__" ? "⭐ Focus Summary"
+              : activeView === "__priority__" ? "🎯 Priority Summary"
               : activeView === "__all__" ? "⊞ Board View"
               : orderedLists.find((l) => l.id === activeView)?.title ?? "Tasks"}
           </span>
@@ -579,6 +625,10 @@ export default function App() {
           {activeView === "__summary__" ? (
             <div style={{ flex: 1, overflowY: "auto" }}>
               <SummaryView allTasks={tasks} onComplete={completeTask} onRank={changeRank} onPriority={changePriority} onUpdateTask={updateTask} />
+            </div>
+          ) : activeView === "__priority__" ? (
+            <div style={{ flex: 1, overflowY: "auto" }}>
+              <PrioritySummaryView allTasks={tasks} onComplete={completeTask} onRank={changeRank} onPriority={changePriority} onUpdateTask={updateTask} />
             </div>
           ) : (
             <div style={{ flex: 1, overflowX: "auto", overflowY: "hidden", padding: 16, display: "flex", gap: 14, alignItems: "flex-start" }}>
