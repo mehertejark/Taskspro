@@ -225,11 +225,9 @@ function InlineText({ value, onSave, multiline = false, textStyle = {}, placehol
     <span onDoubleClick={() => setEditing(true)} title="Double-click to edit"
       style={{
         flex: 1, fontSize: 14, cursor: "text", minWidth: 0,
-        // CHANGE 2: wrap text instead of truncating
-        whiteSpace: multiline ? "pre-wrap" : "nowrap",
-        wordBreak: multiline ? "break-word" : "normal",
-        overflow: multiline ? "visible" : "hidden",
-        textOverflow: multiline ? "unset" : "ellipsis",
+        whiteSpace: "nowrap",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
         lineHeight: "1.4",
         ...textStyle,
       }}
@@ -245,21 +243,19 @@ function TaskRow({ task, onUpdate, onDelete, onComplete, onRank, onPriority, isD
       onDragEnd={onDragEnd}
       onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); onDragOver(task.id); }}
       onDrop={(e) => { e.preventDefault(); e.stopPropagation(); onDrop(task.id); }}
-      style={{ display: "flex", alignItems: "flex-start", gap: 5, padding: "8px 10px", background: isDragging ? "#e8f0fe" : "white", borderBottom: "1px solid #f1f3f4", cursor: "grab", opacity: task.completed ? 0.65 : 1, minWidth: 0 }}
+      style={{ display: "flex", alignItems: "center", gap: 5, padding: "8px 10px", background: isDragging ? "#e8f0fe" : "white", borderBottom: "1px solid #f1f3f4", cursor: "grab", opacity: task.completed ? 0.65 : 1, minWidth: 0 }}
     >
       <input type="checkbox" checked={task.completed} onChange={() => onComplete(task.id)}
         onClick={(e) => e.stopPropagation()}
-        style={{ accentColor: "#1a73e8", flexShrink: 0, width: 15, height: 15, cursor: "pointer", marginTop: 2 }} />
-      {/* CHANGE 2: multiline=true so text wraps */}
-      <InlineText value={task.text} onSave={(t) => onUpdate(task.id, { text: t })} multiline={true}
+        style={{ accentColor: "#1a73e8", flexShrink: 0, width: 15, height: 15, cursor: "pointer" }} />
+      {/* text truncates with ellipsis, wraps only when truly needed */}
+      <InlineText value={task.text} onSave={(t) => onUpdate(task.id, { text: t })} multiline={false}
         textStyle={task.completed ? { textDecoration: "line-through", color: "#9aa0a6" } : { color: "#202124" }}
         placeholder="Task" />
-      <div style={{ display: "flex", flexDirection: "column", gap: 3, flexShrink: 0, alignItems: "flex-end" }}>
-        <PriorityBtn priority={task.priority} onChange={(p) => onPriority(task.id, p)} />
-        <RankField rank={task.rank} onChange={(r) => onRank(task.id, r)} />
-      </div>
+      <PriorityBtn priority={task.priority} onChange={(p) => onPriority(task.id, p)} />
+      <RankField rank={task.rank} onChange={(r) => onRank(task.id, r)} />
       <button onClick={(e) => { e.stopPropagation(); onDelete(task.id); }}
-        style={{ background: "none", border: "none", cursor: "pointer", color: "#bdbdbd", fontSize: 17, padding: "0 2px", lineHeight: 1, flexShrink: 0, marginTop: 1 }}
+        style={{ background: "none", border: "none", cursor: "pointer", color: "#bdbdbd", fontSize: 17, padding: "0 2px", lineHeight: 1, flexShrink: 0 }}
         title="Delete">×</button>
     </div>
   );
