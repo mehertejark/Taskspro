@@ -14,7 +14,6 @@ const firebaseConfig = {
   measurementId: "G-LTGMWWD2JX"
 };
 
-const firebaseApp = initializeApp(firebaseConfig);
 const db = getDatabase(firebaseApp);
 const DATA_REF = ref(db, "tasks-data");
 
@@ -349,22 +348,19 @@ function SummaryView({ allTasks, onComplete, onRank, onPriority, onUpdateTask })
       {ranked.length === 0
         ? <div style={{ padding: 24, background: "white", borderRadius: 8, border: "1px solid #e0e0e0", color: "#9aa0a6", fontSize: 14, textAlign: "center" }}>No ranked tasks yet. Click — on any task to assign a rank.</div>
         : ranked.map((task) => (
-          <div key={task.id} style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "10px 12px", background: "white", borderRadius: 8, border: "1px solid #e0e0e0", marginBottom: 6, boxShadow: "0 1px 2px rgba(0,0,0,0.05)" }}>
-            <span style={{ fontSize: 12, color: "#1a73e8", fontWeight: 700, minWidth: 26, flexShrink: 0, paddingTop: 2 }}>#{task.rank}</span>
+          <div key={task.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", background: "white", borderRadius: 8, border: "1px solid #e0e0e0", marginBottom: 6, boxShadow: "0 1px 2px rgba(0,0,0,0.05)" }}>
+            <span style={{ fontSize: 12, color: "#1a73e8", fontWeight: 700, minWidth: 26, flexShrink: 0 }}>#{task.rank}</span>
             <input type="checkbox" checked={task.completed} onChange={() => onComplete(task.id)}
-              style={{ accentColor: "#1a73e8", flexShrink: 0, width: 15, height: 15, cursor: "pointer", marginTop: 2 }} />
-            {/* CHANGE 3: InlineText with multiline editing instead of plain span */}
+              style={{ accentColor: "#1a73e8", flexShrink: 0, width: 15, height: 15, cursor: "pointer" }} />
             <InlineText
               value={task.text}
               onSave={(t) => onUpdateTask(task.id, { text: t })}
-              multiline={true}
+              multiline={false}
               textStyle={{ color: "#202124" }}
               placeholder="Task"
             />
-            <div style={{ display: "flex", flexDirection: "column", gap: 3, flexShrink: 0, alignItems: "flex-end" }}>
-              <PriorityBtn priority={task.priority} onChange={(p) => onPriority(task.id, p)} />
-              <RankField rank={task.rank} onChange={(r) => onRank(task.id, r)} />
-            </div>
+            <PriorityBtn priority={task.priority} onChange={(p) => onPriority(task.id, p)} />
+            <RankField rank={task.rank} onChange={(r) => onRank(task.id, r)} />
           </div>
         ))
       }
@@ -398,15 +394,13 @@ function PrioritySummaryView({ allTasks, onComplete, onRank, onPriority, onUpdat
                     <span style={{ fontSize: 12, fontWeight: 700, color: pc.color, background: pc.bg, border: `1.5px solid ${pc.border}`, borderRadius: 4, padding: "2px 10px", letterSpacing: "0.02em" }}>{pc.label}</span>
                   </div>
                 )}
-                <div style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "10px 12px", background: "white", borderRadius: 8, border: "1px solid #e0e0e0", marginBottom: 6, boxShadow: "0 1px 2px rgba(0,0,0,0.05)" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", background: "white", borderRadius: 8, border: "1px solid #e0e0e0", marginBottom: 6, boxShadow: "0 1px 2px rgba(0,0,0,0.05)" }}>
                   <input type="checkbox" checked={task.completed} onChange={() => onComplete(task.id)}
-                    style={{ accentColor: "#1a73e8", flexShrink: 0, width: 15, height: 15, cursor: "pointer", marginTop: 2 }} />
+                    style={{ accentColor: "#1a73e8", flexShrink: 0, width: 15, height: 15, cursor: "pointer" }} />
                   <InlineText value={task.text} onSave={(t) => onUpdateTask(task.id, { text: t })}
-                    multiline={true} textStyle={{ color: "#202124" }} placeholder="Task" />
-                  <div style={{ display: "flex", flexDirection: "column", gap: 3, flexShrink: 0, alignItems: "flex-end" }}>
-                    <PriorityBtn priority={task.priority} onChange={(p) => onPriority(task.id, p)} />
-                    <RankField rank={task.rank} onChange={(r) => onRank(task.id, r)} />
-                  </div>
+                    multiline={false} textStyle={{ color: "#202124" }} placeholder="Task" />
+                  <PriorityBtn priority={task.priority} onChange={(p) => onPriority(task.id, p)} />
+                  <RankField rank={task.rank} onChange={(r) => onRank(task.id, r)} />
                 </div>
               </div>
             );
