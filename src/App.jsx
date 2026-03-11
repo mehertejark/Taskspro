@@ -14,6 +14,7 @@ const firebaseConfig = {
   measurementId: "G-LTGMWWD2JX"
 };
 
+const firebaseApp = initializeApp(firebaseConfig);
 const db = getDatabase(firebaseApp);
 const DATA_REF = ref(db, "tasks-data");
 
