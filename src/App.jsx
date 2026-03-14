@@ -1,6 +1,13 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getDatabase, ref, onValue, set } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+import { initializeApp } from "firebase/app";
+import { getDatabase, ref, onValue, set } from "firebase/database";
+import {
+  getAuth,
+  signInWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+  sendPasswordResetEmail,
+} from "firebase/auth";
 
 // ── Firebase Configuration ────────────────────────────────────────────────────
 const firebaseConfig = {
@@ -16,6 +23,7 @@ const firebaseConfig = {
 
 const firebaseApp = initializeApp(firebaseConfig);
 const db = getDatabase(firebaseApp);
+const auth = getAuth(firebaseApp);
 const DATA_REF = ref(db, "tasks-data");
 
 async function saveData(data) {
@@ -50,7 +58,6 @@ function sortActiveTasks(tasks, sort) {
   return [...s, ...done];
 }
 
-// Sort for Priority Summary: H→M→L, then by rank within same priority (nulls last)
 function sortByPriorityThenRank(tasks) {
   const PORD = { H: 0, M: 1, L: 2 };
   return tasks
@@ -118,6 +125,125 @@ function makeDefault() {
   };
 }
 
+// ── Login Screen ──────────────────────────────────────────────────────────────
+function LoginScreen() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [showReset, setShowReset] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetSent, setResetSent] = useState(false);
+
+  const login = async (e) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+    } catch (err) {
+      const msgs = {
+        "auth/user-not-found": "No account found with this email.",
+        "auth/wrong-password": "Incorrect password.",
+        "auth/invalid-email": "Please enter a valid email address.",
+        "auth/too-many-requests": "Too many attempts. Try again later.",
+        "auth/invalid-credential": "Incorrect email or password.",
+      };
+      setError(msgs[err.code] ?? "Login failed. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const sendReset = async (e) => {
+    e.preventDefault();
+    setError("");
+    try {
+      await sendPasswordResetEmail(auth, resetEmail);
+      setResetSent(true);
+    } catch {
+      setError("Could not send reset email. Check the address and try again.");
+    }
+  };
+
+  const inputStyle = {
+    width: "100%", padding: "10px 12px", border: "1.5px solid #dadce0",
+    borderRadius: 8, fontSize: 14, outline: "none", fontFamily: "inherit",
+    boxSizing: "border-box", color: "#202124",
+  };
+
+  return (
+    <div style={{ display: "flex", height: "100vh", alignItems: "center", justifyContent: "center", background: "#f8f9fa", fontFamily: "'Google Sans', Roboto, Arial, sans-serif", padding: 16 }}>
+      <div style={{ background: "white", borderRadius: 12, boxShadow: "0 2px 16px rgba(0,0,0,0.12)", padding: "40px 36px", width: "100%", maxWidth: 380 }}>
+        <div style={{ textAlign: "center", marginBottom: 28 }}>
+          <div style={{ fontSize: 36, marginBottom: 8 }}>✓</div>
+          <div style={{ fontSize: 22, fontWeight: 700, color: "#202124" }}>TasksPro</div>
+          <div style={{ fontSize: 13, color: "#5f6368", marginTop: 4 }}>
+            {showReset ? "Reset your password" : "Sign in to continue"}
+          </div>
+        </div>
+
+        {!showReset ? (
+          <form onSubmit={login}>
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: "#5f6368", display: "block", marginBottom: 5 }}>Email</label>
+              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com" required autoFocus style={inputStyle}
+                onFocus={(e) => e.target.style.borderColor = "#1a73e8"}
+                onBlur={(e) => e.target.style.borderColor = "#dadce0"} />
+            </div>
+            <div style={{ marginBottom: 6 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: "#5f6368", display: "block", marginBottom: 5 }}>Password</label>
+              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••" required style={inputStyle}
+                onFocus={(e) => e.target.style.borderColor = "#1a73e8"}
+                onBlur={(e) => e.target.style.borderColor = "#dadce0"} />
+            </div>
+            <div style={{ textAlign: "right", marginBottom: 18 }}>
+              <button type="button" onClick={() => { setShowReset(true); setResetEmail(email); setError(""); }}
+                style={{ background: "none", border: "none", color: "#1a73e8", fontSize: 12, cursor: "pointer", padding: 0, fontFamily: "inherit" }}>
+                Forgot password?
+              </button>
+            </div>
+            {error && <div style={{ background: "#fce8e6", color: "#c5221f", borderRadius: 8, padding: "9px 12px", fontSize: 13, marginBottom: 14 }}>{error}</div>}
+            <button type="submit" disabled={loading}
+              style={{ width: "100%", padding: 11, background: loading ? "#9aa0a6" : "#1a73e8", color: "white", border: "none", borderRadius: 8, fontSize: 15, fontWeight: 600, cursor: loading ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
+              {loading ? "Signing in…" : "Sign in"}
+            </button>
+          </form>
+        ) : (
+          <>
+            {!resetSent ? (
+              <form onSubmit={sendReset}>
+                <p style={{ fontSize: 13, color: "#5f6368", marginTop: 0, marginBottom: 16 }}>Enter your email and we'll send a password reset link.</p>
+                <div style={{ marginBottom: 14 }}>
+                  <input type="email" value={resetEmail} onChange={(e) => setResetEmail(e.target.value)}
+                    placeholder="you@example.com" required autoFocus style={inputStyle}
+                    onFocus={(e) => e.target.style.borderColor = "#1a73e8"}
+                    onBlur={(e) => e.target.style.borderColor = "#dadce0"} />
+                </div>
+                {error && <div style={{ background: "#fce8e6", color: "#c5221f", borderRadius: 8, padding: "9px 12px", fontSize: 13, marginBottom: 14 }}>{error}</div>}
+                <button type="submit"
+                  style={{ width: "100%", padding: 11, background: "#1a73e8", color: "white", border: "none", borderRadius: 8, fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", marginBottom: 10 }}>
+                  Send reset link
+                </button>
+              </form>
+            ) : (
+              <div style={{ background: "#e6f4ea", color: "#137333", borderRadius: 8, padding: 16, fontSize: 13, marginBottom: 16, textAlign: "center" }}>
+                ✓ Reset email sent! Check your inbox.
+              </div>
+            )}
+            <button onClick={() => { setShowReset(false); setResetSent(false); setError(""); }}
+              style={{ width: "100%", padding: 10, background: "none", color: "#5f6368", border: "1.5px solid #dadce0", borderRadius: 8, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>
+              ← Back to sign in
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Sync Status Dot ───────────────────────────────────────────────────────────
 function SyncDot({ status }) {
   const cfg = {
@@ -156,7 +282,7 @@ function PriorityBtn({ priority, onChange }) {
 function RankField({ rank, onChange }) {
   const [editing, setEditing] = useState(false);
   const [val, setVal] = useState(rank ?? "");
-  const ref = useRef();
+  const inputRef = useRef();
   useEffect(() => { if (!editing) setVal(rank ?? ""); }, [rank, editing]);
   const commit = () => {
     setEditing(false);
@@ -166,7 +292,7 @@ function RankField({ rank, onChange }) {
     else { onChange(null); setVal(""); }
   };
   if (editing) return (
-    <input ref={ref} type="number" min={1} value={val}
+    <input ref={inputRef} type="number" min={1} value={val}
       onChange={(e) => setVal(e.target.value)}
       onBlur={commit}
       onKeyDown={(e) => { if (e.key === "Enter") commit(); if (e.key === "Escape") { setEditing(false); setVal(rank ?? ""); } }}
@@ -177,7 +303,7 @@ function RankField({ rank, onChange }) {
   return (
     <button
       onPointerDown={(e) => e.stopPropagation()}
-      onClick={(e) => { e.stopPropagation(); setEditing(true); setTimeout(() => ref.current?.select(), 40); }}
+      onClick={(e) => { e.stopPropagation(); setEditing(true); setTimeout(() => inputRef.current?.select(), 40); }}
       title="Click to set rank"
       style={{
         minWidth: 40, fontSize: 11, textAlign: "center",
@@ -192,7 +318,7 @@ function RankField({ rank, onChange }) {
   );
 }
 
-// ── InlineText — supports multiline wrapping ──────────────────────────────────
+// ── InlineText ────────────────────────────────────────────────────────────────
 function InlineText({ value, onSave, multiline = false, textStyle = {}, placeholder = "" }) {
   const [editing, setEditing] = useState(false);
   const [val, setVal] = useState(value);
@@ -204,34 +330,22 @@ function InlineText({ value, onSave, multiline = false, textStyle = {}, placehol
   };
   if (editing) {
     if (multiline) return (
-      <textarea value={val}
-        onChange={(e) => setVal(e.target.value)}
-        onBlur={commit}
+      <textarea value={val} onChange={(e) => setVal(e.target.value)} onBlur={commit}
         onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); commit(); } if (e.key === "Escape") { setEditing(false); setVal(value); } }}
-        rows={2}
-        style={{ flex: 1, border: "none", borderBottom: "2px solid #1a73e8", outline: "none", fontSize: 14, background: "transparent", fontFamily: "inherit", color: "#202124", minWidth: 0, resize: "none", lineHeight: "1.4", ...textStyle }}
-        autoFocus />
+        rows={2} autoFocus
+        style={{ flex: 1, border: "none", borderBottom: "2px solid #1a73e8", outline: "none", fontSize: 14, background: "transparent", fontFamily: "inherit", color: "#202124", minWidth: 0, resize: "none", lineHeight: "1.4", ...textStyle }} />
     );
     return (
-      <input value={val}
-        onChange={(e) => setVal(e.target.value)}
-        onBlur={commit}
+      <input value={val} onChange={(e) => setVal(e.target.value)} onBlur={commit} autoFocus
         onKeyDown={(e) => { if (e.key === "Enter") commit(); if (e.key === "Escape") { setEditing(false); setVal(value); } }}
-        style={{ flex: 1, border: "none", borderBottom: "2px solid #1a73e8", outline: "none", fontSize: 14, background: "transparent", fontFamily: "inherit", color: "#202124", minWidth: 0, ...textStyle }}
-        autoFocus />
+        style={{ flex: 1, border: "none", borderBottom: "2px solid #1a73e8", outline: "none", fontSize: 14, background: "transparent", fontFamily: "inherit", color: "#202124", minWidth: 0, ...textStyle }} />
     );
   }
   return (
     <span onDoubleClick={() => setEditing(true)} title="Double-click to edit"
-      style={{
-        flex: 1, fontSize: 14, cursor: "text", minWidth: 0,
-        whiteSpace: "nowrap",
-        overflow: "hidden",
-        textOverflow: "ellipsis",
-        lineHeight: "1.4",
-        ...textStyle,
-      }}
-    >{value || <span style={{ color: "#9aa0a6" }}>{placeholder}</span>}</span>
+      style={{ flex: 1, fontSize: 14, cursor: "text", minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", lineHeight: "1.4", ...textStyle }}>
+      {value || <span style={{ color: "#9aa0a6" }}>{placeholder}</span>}
+    </span>
   );
 }
 
@@ -243,15 +357,12 @@ function TaskRow({ task, onUpdate, onDelete, onComplete, onRank, onPriority, isD
       onDragEnd={onDragEnd}
       onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); onDragOver(task.id); }}
       onDrop={(e) => { e.preventDefault(); e.stopPropagation(); onDrop(task.id); }}
-      style={{ display: "flex", alignItems: "center", gap: 5, padding: "8px 10px", background: isDragging ? "#e8f0fe" : "white", borderBottom: "1px solid #f1f3f4", cursor: "grab", opacity: task.completed ? 0.65 : 1, minWidth: 0 }}
-    >
+      style={{ display: "flex", alignItems: "center", gap: 5, padding: "8px 10px", background: isDragging ? "#e8f0fe" : "white", borderBottom: "1px solid #f1f3f4", cursor: "grab", opacity: task.completed ? 0.65 : 1, minWidth: 0 }}>
       <input type="checkbox" checked={task.completed} onChange={() => onComplete(task.id)}
         onClick={(e) => e.stopPropagation()}
         style={{ accentColor: "#1a73e8", flexShrink: 0, width: 15, height: 15, cursor: "pointer" }} />
-      {/* text truncates with ellipsis, wraps only when truly needed */}
       <InlineText value={task.text} onSave={(t) => onUpdate(task.id, { text: t })} multiline={false}
-        textStyle={task.completed ? { textDecoration: "line-through", color: "#9aa0a6" } : { color: "#202124" }}
-        placeholder="Task" />
+        textStyle={task.completed ? { textDecoration: "line-through", color: "#9aa0a6" } : { color: "#202124" }} placeholder="Task" />
       <PriorityBtn priority={task.priority} onChange={(p) => onPriority(task.id, p)} />
       <RankField rank={task.rank} onChange={(r) => onRank(task.id, r)} />
       <button onClick={(e) => { e.stopPropagation(); onDelete(task.id); }}
@@ -269,8 +380,7 @@ function NewTask({ onAdd }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 10px", borderTop: "1px solid #f1f3f4", background: "#fafafa", flexShrink: 0 }}>
       <span style={{ color: "#9aa0a6", fontSize: 16, flexShrink: 0 }}>+</span>
-      <input value={text} onChange={(e) => setText(e.target.value)}
-        onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
+      <input value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
         placeholder="Add a task"
         style={{ flex: 1, border: "none", outline: "none", fontSize: 13, background: "transparent", fontFamily: "inherit", color: "#202124", minWidth: 0 }} />
       <PriorityBtn priority={priority} onChange={setPriority} />
@@ -287,16 +397,12 @@ function ListCard({ list, tasks, onAddTask, onUpdateTask, onDeleteTask, onComple
   const active = sorted.filter((t) => !t.completed);
   const done = sorted.filter((t) => t.completed);
   return (
-    <div
-      onDragOver={(e) => { e.preventDefault(); onListDragOver(list.id); }}
-      onDrop={(e) => { e.preventDefault(); onListDrop(list.id); }}
-      style={{ width: 300, minWidth: 300, flexShrink: 0, background: "white", borderRadius: 8, border: `2px solid ${isListDragging ? "#1a73e8" : "#e0e0e0"}`, boxShadow: "0 1px 3px rgba(0,0,0,0.07)", display: "flex", flexDirection: "column", maxHeight: "calc(100vh - 80px)" }}
-    >
+    <div onDragOver={(e) => { e.preventDefault(); onListDragOver(list.id); }} onDrop={(e) => { e.preventDefault(); onListDrop(list.id); }}
+      style={{ width: 300, minWidth: 300, flexShrink: 0, background: "white", borderRadius: 8, border: `2px solid ${isListDragging ? "#1a73e8" : "#e0e0e0"}`, boxShadow: "0 1px 3px rgba(0,0,0,0.07)", display: "flex", flexDirection: "column", maxHeight: "calc(100vh - 80px)" }}>
       <div draggable
         onDragStart={(e) => { e.dataTransfer.setData("listId", list.id); onListDragStart(list.id); }}
         onDragEnd={onListDragEnd}
-        style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 10px", borderBottom: "1px solid #f1f3f4", background: "#f8f9fa", cursor: "grab", flexShrink: 0, borderRadius: "6px 6px 0 0" }}
-      >
+        style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 10px", borderBottom: "1px solid #f1f3f4", background: "#f8f9fa", cursor: "grab", flexShrink: 0, borderRadius: "6px 6px 0 0" }}>
         <span style={{ color: "#bdbdbd", fontSize: 12, flexShrink: 0 }}>⠿</span>
         <InlineText value={list.title} onSave={(t) => onRenameList(list.id, t)} textStyle={{ fontWeight: 600, color: "#202124" }} placeholder="List name" />
         <select value={list.sort} onChange={(e) => onSortChange(list.id, e.target.value)} onClick={(e) => e.stopPropagation()}
@@ -339,7 +445,7 @@ function ListCard({ list, tasks, onAddTask, onUpdateTask, onDeleteTask, onComple
   );
 }
 
-// ── SummaryView — CHANGE 3: inline text editing enabled ──────────────────────
+// ── SummaryView ───────────────────────────────────────────────────────────────
 function SummaryView({ allTasks, onComplete, onRank, onPriority, onUpdateTask }) {
   const ranked = allTasks.filter((t) => t.rank != null && !t.completed).sort((a, b) => a.rank - b.rank);
   return (
@@ -353,13 +459,7 @@ function SummaryView({ allTasks, onComplete, onRank, onPriority, onUpdateTask })
             <span style={{ fontSize: 12, color: "#1a73e8", fontWeight: 700, minWidth: 26, flexShrink: 0 }}>#{task.rank}</span>
             <input type="checkbox" checked={task.completed} onChange={() => onComplete(task.id)}
               style={{ accentColor: "#1a73e8", flexShrink: 0, width: 15, height: 15, cursor: "pointer" }} />
-            <InlineText
-              value={task.text}
-              onSave={(t) => onUpdateTask(task.id, { text: t })}
-              multiline={false}
-              textStyle={{ color: "#202124" }}
-              placeholder="Task"
-            />
+            <InlineText value={task.text} onSave={(t) => onUpdateTask(task.id, { text: t })} multiline={false} textStyle={{ color: "#202124" }} placeholder="Task" />
             <PriorityBtn priority={task.priority} onChange={(p) => onPriority(task.id, p)} />
             <RankField rank={task.rank} onChange={(r) => onRank(task.id, r)} />
           </div>
@@ -369,7 +469,7 @@ function SummaryView({ allTasks, onComplete, onRank, onPriority, onUpdateTask })
   );
 }
 
-// ── PrioritySummaryView — sorted by Priority (H→M→L) then Rank ───────────────
+// ── PrioritySummaryView ───────────────────────────────────────────────────────
 function PrioritySummaryView({ allTasks, onComplete, onRank, onPriority, onUpdateTask }) {
   const sorted = sortByPriorityThenRank(allTasks);
   const PLABEL = {
@@ -383,7 +483,7 @@ function PrioritySummaryView({ allTasks, onComplete, onRank, onPriority, onUpdat
       <h2 style={{ margin: "0 0 4px", fontSize: 18, fontWeight: 600, color: "#202124" }}>🎯 Priority Summary</h2>
       <p style={{ margin: "0 0 16px", fontSize: 13, color: "#5f6368" }}>All tasks by priority (H→M→L), then by rank — double-tap text to edit</p>
       {sorted.length === 0
-        ? <div style={{ padding: 24, background: "white", borderRadius: 8, border: "1px solid #e0e0e0", color: "#9aa0a6", fontSize: 14, textAlign: "center" }}>No active tasks yet. Add tasks from the Board View.</div>
+        ? <div style={{ padding: 24, background: "white", borderRadius: 8, border: "1px solid #e0e0e0", color: "#9aa0a6", fontSize: 14, textAlign: "center" }}>No active tasks yet.</div>
         : sorted.map((task) => {
             const showHeader = task.priority !== lastPriority;
             lastPriority = task.priority;
@@ -392,14 +492,13 @@ function PrioritySummaryView({ allTasks, onComplete, onRank, onPriority, onUpdat
               <div key={task.id}>
                 {showHeader && (
                   <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "16px 0 8px", paddingBottom: 5, borderBottom: `2px solid ${pc.border}` }}>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: pc.color, background: pc.bg, border: `1.5px solid ${pc.border}`, borderRadius: 4, padding: "2px 10px", letterSpacing: "0.02em" }}>{pc.label}</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: pc.color, background: pc.bg, border: `1.5px solid ${pc.border}`, borderRadius: 4, padding: "2px 10px" }}>{pc.label}</span>
                   </div>
                 )}
                 <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", background: "white", borderRadius: 8, border: "1px solid #e0e0e0", marginBottom: 6, boxShadow: "0 1px 2px rgba(0,0,0,0.05)" }}>
                   <input type="checkbox" checked={task.completed} onChange={() => onComplete(task.id)}
                     style={{ accentColor: "#1a73e8", flexShrink: 0, width: 15, height: 15, cursor: "pointer" }} />
-                  <InlineText value={task.text} onSave={(t) => onUpdateTask(task.id, { text: t })}
-                    multiline={false} textStyle={{ color: "#202124" }} placeholder="Task" />
+                  <InlineText value={task.text} onSave={(t) => onUpdateTask(task.id, { text: t })} multiline={false} textStyle={{ color: "#202124" }} placeholder="Task" />
                   <PriorityBtn priority={task.priority} onChange={(p) => onPriority(task.id, p)} />
                   <RankField rank={task.rank} onChange={(r) => onRank(task.id, r)} />
                 </div>
@@ -422,13 +521,12 @@ function NavItem({ label, icon, count, active, onClick }) {
   );
 }
 
-// ── App ───────────────────────────────────────────────────────────────────────
-export default function App() {
+// ── TaskApp (shown after successful login) ────────────────────────────────────
+function TaskApp({ user }) {
   const [data, setData] = useState(null);
   const [activeView, setActiveView] = useState("__summary__");
   const [syncStatus, setSyncStatus] = useState("connecting");
   const [ready, setReady] = useState(false);
-  // CHANGE 1: collapsible sidebar
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const saveTimer = useRef(null);
@@ -440,13 +538,8 @@ export default function App() {
   useEffect(() => {
     const unsub = onValue(DATA_REF, (snapshot) => {
       const val = snapshot.val();
-      if (val) {
-        setData(val);
-      } else {
-        const defaults = makeDefault();
-        setData(defaults);
-        set(DATA_REF, defaults);
-      }
+      if (val) { setData(val); }
+      else { const defaults = makeDefault(); setData(defaults); set(DATA_REF, defaults); }
       setReady(true);
       setSyncStatus("synced");
     }, (error) => {
@@ -461,10 +554,7 @@ export default function App() {
   const persist = useCallback((d) => {
     clearTimeout(saveTimer.current);
     setSyncStatus("saving");
-    saveTimer.current = setTimeout(async () => {
-      await saveData(d);
-      setSyncStatus("synced");
-    }, 400);
+    saveTimer.current = setTimeout(async () => { await saveData(d); setSyncStatus("synced"); }, 400);
   }, []);
 
   const update = useCallback((fn) => {
@@ -474,7 +564,7 @@ export default function App() {
   if (!ready) return (
     <div style={{ display: "flex", height: "100vh", alignItems: "center", justifyContent: "center", fontFamily: "Google Sans, Roboto, sans-serif", color: "#5f6368", flexDirection: "column", gap: 12 }}>
       <div style={{ fontSize: 28 }}>✓</div>
-      <div style={{ fontSize: 15 }}>Connecting to sync…</div>
+      <div style={{ fontSize: 15 }}>Loading your tasks…</div>
     </div>
   );
 
@@ -554,31 +644,23 @@ export default function App() {
   return (
     <div style={{ display: "flex", height: "100vh", fontFamily: "'Google Sans', Roboto, Arial, sans-serif", background: "#f8f9fa", overflow: "hidden" }}>
 
-      {/* CHANGE 1: Collapsible sidebar */}
-      <aside style={{
-        width: sidebarOpen ? 220 : 0,
-        minWidth: sidebarOpen ? 220 : 0,
-        background: "white",
-        borderRight: sidebarOpen ? "1px solid #e0e0e0" : "none",
-        display: "flex", flexDirection: "column", overflow: "hidden",
-        flexShrink: 0,
-        transition: "width 0.25s ease, min-width 0.25s ease",
-      }}>
+      {/* Collapsible Sidebar */}
+      <aside style={{ width: sidebarOpen ? 220 : 0, minWidth: sidebarOpen ? 220 : 0, background: "white", borderRight: sidebarOpen ? "1px solid #e0e0e0" : "none", display: "flex", flexDirection: "column", overflow: "hidden", flexShrink: 0, transition: "width 0.25s ease, min-width 0.25s ease" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "14px 14px 10px", minWidth: 220 }}>
           <span style={{ fontSize: 22 }}>✓</span>
           <span style={{ fontSize: 16, fontWeight: 600, color: "#202124", flex: 1 }}>Tasks</span>
           <SyncDot status={syncStatus} />
         </div>
         <nav style={{ flex: 1, overflowY: "auto", padding: "0 8px", minWidth: 220 }}>
-          <NavItem label="⭐ Focus Summary" active={activeView === "__summary__"} onClick={() => { setActiveView("__summary__"); }} />
-          <NavItem label="🎯 Priority Summary" active={activeView === "__priority__"} onClick={() => { setActiveView("__priority__"); }} />
-          <NavItem label="⊞ Board View" active={activeView === "__all__"} onClick={() => { setActiveView("__all__"); }} />
+          <NavItem label="⭐ Focus Summary" active={activeView === "__summary__"} onClick={() => setActiveView("__summary__")} />
+          <NavItem label="🎯 Priority Summary" active={activeView === "__priority__"} onClick={() => setActiveView("__priority__")} />
+          <NavItem label="⊞ Board View" active={activeView === "__all__"} onClick={() => setActiveView("__all__")} />
           <div style={{ borderTop: "1px solid #f1f3f4", margin: "6px 0" }} />
           <div style={{ fontSize: 11, color: "#9aa0a6", padding: "0 12px 4px", textTransform: "uppercase", letterSpacing: "0.06em" }}>My Lists</div>
           {orderedLists.map((list) => (
             <NavItem key={list.id} label={list.title} icon="☰"
               count={tasks.filter((t) => t.listId === list.id && !t.completed).length}
-              active={activeView === list.id} onClick={() => { setActiveView(list.id); }} />
+              active={activeView === list.id} onClick={() => setActiveView(list.id)} />
           ))}
         </nav>
         <div style={{ padding: "8px 10px", borderTop: "1px solid #f1f3f4", minWidth: 220 }}>
@@ -588,28 +670,32 @@ export default function App() {
         </div>
       </aside>
 
-      {/* Main area */}
+      {/* Main */}
       <div style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column", minWidth: 0 }}>
 
-        {/* Top bar with hamburger toggle */}
+        {/* Top bar */}
         <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", background: "white", borderBottom: "1px solid #e0e0e0", flexShrink: 0 }}>
-          {/* CHANGE 1: hamburger button */}
-          <button
-            onClick={() => setSidebarOpen((o) => !o)}
-            title={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
-            style={{ background: "none", border: "none", cursor: "pointer", padding: "4px 6px", borderRadius: 6, color: "#5f6368", fontSize: 18, lineHeight: 1, display: "flex", flexDirection: "column", gap: 3, alignItems: "center", justifyContent: "center", flexShrink: 0 }}
-          >
+          <button onClick={() => setSidebarOpen((o) => !o)}
+            style={{ background: "none", border: "none", cursor: "pointer", padding: "4px 6px", borderRadius: 6, display: "flex", flexDirection: "column", gap: 3, alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
             <span style={{ display: "block", width: 18, height: 2, background: "#5f6368", borderRadius: 2 }} />
             <span style={{ display: "block", width: 18, height: 2, background: "#5f6368", borderRadius: 2 }} />
             <span style={{ display: "block", width: 18, height: 2, background: "#5f6368", borderRadius: 2 }} />
           </button>
-          <span style={{ fontSize: 15, fontWeight: 600, color: "#202124" }}>
+          <span style={{ fontSize: 15, fontWeight: 600, color: "#202124", flex: 1 }}>
             {activeView === "__summary__" ? "⭐ Focus Summary"
               : activeView === "__priority__" ? "🎯 Priority Summary"
               : activeView === "__all__" ? "⊞ Board View"
               : orderedLists.find((l) => l.id === activeView)?.title ?? "Tasks"}
           </span>
           {!sidebarOpen && <SyncDot status={syncStatus} />}
+          {/* Signed-in user + sign out */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+            <span style={{ fontSize: 12, color: "#5f6368", maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user.email}</span>
+            <button onClick={() => signOut(auth)}
+              style={{ fontSize: 12, color: "#5f6368", background: "none", border: "1px solid #dadce0", borderRadius: 6, padding: "4px 10px", cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>
+              Sign out
+            </button>
+          </div>
         </div>
 
         <main style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
@@ -638,4 +724,23 @@ export default function App() {
       </div>
     </div>
   );
+}
+
+// ── Root — Auth Gate ──────────────────────────────────────────────────────────
+export default function App() {
+  const [user, setUser] = useState(undefined); // undefined = checking, null = logged out
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (u) => setUser(u ?? null));
+    return () => unsub();
+  }, []);
+
+  if (user === undefined) return (
+    <div style={{ display: "flex", height: "100vh", alignItems: "center", justifyContent: "center", fontFamily: "Google Sans, Roboto, sans-serif", color: "#5f6368", flexDirection: "column", gap: 12 }}>
+      <div style={{ fontSize: 28 }}>✓</div>
+      <div style={{ fontSize: 15 }}>Loading…</div>
+    </div>
+  );
+
+  return user ? <TaskApp user={user} /> : <LoginScreen />;
 }
