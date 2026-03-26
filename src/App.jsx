@@ -398,7 +398,7 @@ function ListCard({ list, tasks, onAddTask, onUpdateTask, onDeleteTask, onComple
   const done = sorted.filter((t) => t.completed);
   return (
     <div onDragOver={(e) => { e.preventDefault(); onListDragOver(list.id); }} onDrop={(e) => { e.preventDefault(); onListDrop(list.id); }}
-      style={{ width: 300, minWidth: 300, flexShrink: 0, background: "white", borderRadius: 8, border: `2px solid ${isListDragging ? "#1a73e8" : "#e0e0e0"}`, boxShadow: "0 1px 3px rgba(0,0,0,0.07)", display: "flex", flexDirection: "column", maxHeight: "calc(100vh - 80px)" }}>
+      style={{ width: 400, minWidth: 400, flexShrink: 0, background: "white", borderRadius: 8, border: `2px solid ${isListDragging ? "#1a73e8" : "#e0e0e0"}`, boxShadow: "0 1px 3px rgba(0,0,0,0.07)", display: "flex", flexDirection: "column", maxHeight: "calc(100vh - 80px)" }}>
       <div draggable
         onDragStart={(e) => { e.dataTransfer.setData("listId", list.id); onListDragStart(list.id); }}
         onDragEnd={onListDragEnd}
