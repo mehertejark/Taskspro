@@ -375,8 +375,8 @@ function TaskRow({ task, onUpdate, onDelete, onComplete, onRank, onPriority, isD
 // ── NewTask ───────────────────────────────────────────────────────────────────
 function NewTask({ onAdd }) {
   const [text, setText] = useState("");
-  const [priority, setPriority] = useState("H");
-  const submit = () => { if (!text.trim()) return; onAdd(text.trim(), priority); setText(""); setPriority("H"); };
+  const [priority, setPriority] = useState("M");
+  const submit = () => { if (!text.trim()) return; onAdd(text.trim(), priority); setText(""); setPriority("M"); };
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 10px", borderTop: "1px solid #f1f3f4", background: "#fafafa", flexShrink: 0 }}>
       <span style={{ color: "#9aa0a6", fontSize: 16, flexShrink: 0 }}>+</span>
